@@ -1,0 +1,416 @@
+#include <iostream>
+#include <string>
+#include <list>
+#include <vector>
+#include <fstream>
+#include <ctime>
+#include <chrono>
+#include <functional>
+#include <map>
+#include <random>
+
+using namespace std;
+
+struct Flower {
+    string name = "FlowerName";
+    string color = "Color";
+    string scent = "Scent";
+    string regions = "Regions";
+
+    bool operator==(const Flower& flower) const {
+        return this->name == flower.name && this->color == flower.color && this->scent == flower.scent && this->regions == flower.regions;
+    }
+
+    friend ostream& operator<<(ostream& os, const Flower& flower);
+};
+
+ostream& operator<<(ostream& os, const Flower& flower) {
+    os << flower.name << ' ' << flower.color << ' ' << flower.scent << ' ' << flower.regions;
+    return os;
+}
+
+vector<Flower> readFile(const string& file, int size) {
+    ifstream inputFile(file);
+    vector<Flower> result(size);
+    for (int i = 0; i < size; i++) {
+        inputFile >> result[i].name;
+        inputFile >> result[i].color;
+        inputFile >> result[i].scent;
+        inputFile >> result[i].regions;
+    }
+    inputFile.close();
+    return result;
+}
+
+// --------------------------------Бинарное дерево поиска-----------------------------------------------
+
+// Узел для бинарного дерева поиска
+class Node {
+public:
+    string key;
+    Node* left;
+    Node* right;
+
+    Node(string key) {
+        this->key = key;
+        left = nullptr;
+        right = nullptr;
+    }
+};
+
+class BinaryTree {
+private:
+    Node* root;
+
+    Node* insertRecursive(Node* root, string key) {
+        if (root == nullptr) {
+            return new Node(key);
+        }
+
+        if (key < root->key) {
+            root->left = insertRecursive(root->left, key);
+        }
+        else if (key > root->key) {
+            root->right = insertRecursive(root->right, key);
+        }
+
+        return root;
+    }
+    // Поиск узла в бинарном дереве
+    Node* searchRecursive(Node* root, string key) {
+        if (root == nullptr || root->key == key) {
+            return root;
+        }
+
+        if (key < root->key) {
+            return searchRecursive(root->left, key);
+        }
+        else {
+            return searchRecursive(root->right, key);
+        }
+    }
+public:
+    BinaryTree() {
+        root = nullptr;
+    }
+
+    void insert(string key) {
+        root = insertRecursive(root, key);
+    }
+
+    Node* search(string key) {
+        return searchRecursive(root, key);
+    }
+};
+
+// --------------------------------Красно-Черное дерево-----------------------------------------------
+
+class RBTNode {
+public:
+    string key;       // Ключевое значение узла
+    RBTNode* left;    // Указатель на левого потомка
+    RBTNode* right;   // Указатель на правого потомка
+    RBTNode* parent;  // Указатель на родителя
+    bool color;       // Цвет узла (0 - черный, 1 - красный)
+
+    RBTNode() : key(""), left(nullptr), right(nullptr), parent(nullptr), color(0) {}  // Конструктор по умолчанию
+
+    RBTNode(string key) : key(std::move(key)), left(nullptr), right(nullptr), parent(nullptr), color(0) {}  // Конструктор с ключом
+};
+
+class RedBlackTree {
+private:
+    RBTNode* root; // Указатель на корень дерева
+    RBTNode* TNULL; // Указатель на пустой узел
+
+    // Рекурсивная функция для поиска узла в дереве по ключу
+    RBTNode* searchTreeHelper(RBTNode* node, string key) {
+        if (node == TNULL || key == node->key) {
+            return node;
+        }
+
+        if (key < node->key) {
+            return searchTreeHelper(node->left, key);
+        }
+        return searchTreeHelper(node->right, key);
+    }
+
+    // Функция для восстановления свойств красно-черного дерева после вставки
+    void insertFix(RBTNode* k) {
+        RBTNode* u;
+        while (k->parent->color == 1) {
+            if (k->parent == k->parent->parent->right) {
+                // Случай 1: Родитель красный, дядя тоже красный
+                u = k->parent->parent->left;
+                if (u->color == 1) {
+                    u->color = 0;
+                    k->parent->color = 0;
+                    k->parent->parent->color = 1;
+                    k = k->parent->parent;
+                }
+                else {
+                    // Случай 2: Родитель красный, дядя черный, k - правый ребенок
+                    if (k == k->parent->left) {
+                        k = k->parent;
+                        rightRotate(k);
+                    }
+                    // Случай 3: Родитель красный, дядя черный, k - левый ребенок
+                    k->parent->color = 0;
+                    k->parent->parent->color = 1;
+                    leftRotate(k->parent->parent);
+                }
+            }
+            else {
+                // Симметричные случаи для правого поддерева
+                u = k->parent->parent->right;
+
+                if (u->color == 1) {
+                    u->color = 0;
+                    k->parent->color = 0;
+                    k->parent->parent->color = 1;
+                    k = k->parent->parent;
+                }
+                else {
+                    if (k == k->parent->right) {
+                        k = k->parent;
+                        leftRotate(k);
+                    }
+                    k->parent->color = 0;
+                    k->parent->parent->color = 1;
+                    rightRotate(k->parent->parent);
+                }
+            }
+            if (k == root) {
+                break;
+            }
+        }
+        root->color = 0;
+    }
+
+    void leftRotate(RBTNode* x) {
+        RBTNode* y = x->right;
+        x->right = y->left;
+        if (y->left != TNULL) {
+            y->left->parent = x;
+        }
+        y->parent = x->parent;
+        if (x->parent == nullptr) {
+            this->root = y;
+        }
+        else if (x == x->parent->left) {
+            x->parent->left = y;
+        }
+        else {
+            x->parent->right = y;
+        }
+        y->left = x;
+        x->parent = y;
+    }
+
+    void rightRotate(RBTNode* x) {
+        RBTNode* y = x->left;
+        x->left = y->right;
+        if (y->right != TNULL) {
+            y->right->parent = x;
+        }
+        y->parent = x->parent;
+        if (x->parent == nullptr) {
+            this->root = y;
+        }
+        else if (x->parent->right == x) {
+            x->parent->right = y;
+        }
+        else {
+            x->parent->left = y;
+        }
+        y->right = x;
+        x->parent = y;
+    }
+
+public:
+    RedBlackTree() {
+        TNULL = new RBTNode;
+        TNULL->color = 0;
+        TNULL->left = nullptr;
+        TNULL->right = nullptr;
+        root = TNULL;
+    }
+
+    RBTNode* search(string k) {
+        return searchTreeHelper(this->root, k);
+    }
+
+    // Метод для вставки нового узла в дерево
+    void insert(string key) {
+        // Реализация вставки с последующим восстановлением свойств красно-черного дерева
+        RBTNode* node = new RBTNode;
+        node->parent = nullptr;
+        node->key = key;
+        node->left = TNULL;
+        node->right = TNULL;
+        node->color = 1;
+
+        RBTNode* y = nullptr;
+        RBTNode* x = this->root;
+
+        while (x != TNULL) {
+            y = x;
+            if (node->key < x->key) {
+                x = x->left;
+            }
+            else {
+                x = x->right;
+            }
+        }
+
+        node->parent = y;
+        if (y == nullptr) {
+            root = node;
+        }
+        else if (node->key < y->key) {
+            y->left = node;
+        }
+        else {
+            y->right = node;
+        }
+
+        if (node->parent == nullptr) {
+            node->color = 0;
+            return;
+        }
+
+        if (node->parent->parent == nullptr) {
+            return;
+        }
+
+        insertFix(node);
+    }
+};
+// --------------------------------Хэш таблица-----------------------------------------------
+
+class HashTable {
+private:
+    vector<list<pair<string, Flower>>> table; // Таблица для хранения списков пар (ключ, значение)
+    int size; // Размер таблицы
+    int collisions;  // Количество коллизий
+
+    size_t hashFunction(const string& key) const {
+        // Генерация хэш-значения для строки и взятие по модулю размера таблицы
+        return hash<string>{}(key) % size;
+    }
+
+public:
+    // Конструктор для инициализации хэш-таблицы с заданным размером
+    HashTable(int initialSize) : size(initialSize) {
+        table.resize(size);
+    }
+
+    // Метод для вставки элемента в хэш-таблицу
+    void insert(const string& key, const Flower& value) {
+        size_t hashValue = hashFunction(key);
+        if (!table[hashValue].empty()) {  // Проверка на коллизию
+            collisions++;  // Увеличение счетчика коллизий
+        }
+        table[hashValue].emplace_back(key, value);  // Вставка элемента в список
+    }
+
+    // Метод для поиска элемента в хэш-таблице по ключу
+    Flower search(const string& key) {
+        size_t hashValue = hashFunction(key);
+        for (const auto& item : table[hashValue]) {
+            if (item.first == key) {
+                return item.second;
+            }
+        }
+        return Flower(); // Возвращает пустой объект Flower, если ключ не найден
+    }
+
+    // Метод для получения количества коллизий
+    int getCollisionCount() const {
+        return collisions;  // Возврат количества коллизий
+    }
+};
+
+void measureSearchTime(vector<Flower>& flowers, int searches) {
+    vector<string> keys;
+    for (auto& flower : flowers) {
+        keys.push_back(flower.name);
+    }
+
+    // Binary Tree
+    BinaryTree binaryTree;
+    for (auto& flower : flowers) {
+        binaryTree.insert(flower.name);
+    }
+
+    auto start = chrono::high_resolution_clock::now();
+    for (int i = 0; i < searches; i++)
+    {
+        string key = keys[rand() % keys.size()];
+        Node* node = binaryTree.search(key);
+    }
+    auto end = chrono::high_resolution_clock::now();
+    auto duration = chrono::duration_cast<chrono::nanoseconds>(end - start);
+    cout << "Binary Tree Search Time: " << duration.count() << " nanoseconds" << endl;
+
+    // Red Black Tree
+    RedBlackTree redBlackTree;
+    for (auto& flower : flowers) {
+        redBlackTree.insert(flower.name);
+    }
+
+    start = chrono::high_resolution_clock::now();
+    for (int i = 0; i < searches; i++) {
+        string key = keys[rand() % keys.size()];
+        RBTNode* node = redBlackTree.search(key);
+    }
+    end = chrono::high_resolution_clock::now();
+    duration = chrono::duration_cast<chrono::nanoseconds>(end - start);
+    cout << "Red Black Tree Search Time: " << duration.count() << " nanoseconds" << endl;
+
+    // Hash Table
+    HashTable hashTable(flowers.size());
+    for (auto& flower : flowers) {
+        hashTable.insert(flower.name, flower);
+    }
+
+    start = chrono::high_resolution_clock::now();
+    for (int i = 0; i < searches; i++) {
+        string key = keys[rand() % keys.size()];
+        Flower flower = hashTable.search(key);
+    }
+    end = chrono::high_resolution_clock::now();
+    duration = chrono::duration_cast<chrono::nanoseconds>(end - start);
+    cout << "Hash Table Search Time: " << duration.count() << " nanoseconds" << endl;
+
+    // Multimap
+    multimap<string, Flower> myMultimap;
+    for (auto& flower : flowers) {
+        myMultimap.insert(make_pair(flower.name, flower));
+    }
+
+    start = chrono::high_resolution_clock::now();
+    for (int i = 0; i < searches; i++) {
+        string key = keys[rand() % keys.size()];
+        auto it = myMultimap.find(key);
+        if (it != myMultimap.end()) {
+            Flower flower = it->second;
+        }
+    }
+    end = chrono::high_resolution_clock::now();
+    duration = chrono::duration_cast<chrono::nanoseconds>(end - start);
+    cout << "Multimap Search Time: " << duration.count() << " nanoseconds" << endl;
+}
+
+int main() {
+    vector<int> sizes = { 100, 500, 1000, 3000, 5000, 10000, 50000, 100000 };
+    int searches = 10;
+    for (int size : sizes) {
+        char buffer[50];
+        sprintf_s(buffer, sizeof(buffer), "D:\\arr_%d.txt", size);
+        vector<Flower> flowers = readFile(buffer, size);
+        measureSearchTime(flowers, searches);
+        cout << endl;
+    }
+    return 0;
+}
