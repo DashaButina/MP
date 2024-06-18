@@ -1,0 +1,194 @@
+#include <iostream>
+#include <vector>
+#include <list>
+#include <algorithm>
+
+// Абстрактный класс, определяющий интерфейс для различных реализаций множества
+class SetImpl {
+public:
+    virtual ~SetImpl() = default;
+    virtual void add(int value) = 0; // Добавление элемента
+    virtual void remove(int value) = 0; // Удаление элемента
+    virtual bool contains(int value) const = 0; // Проверка наличия элемента
+    virtual int size() const = 0; // Получение размера множества
+};
+
+// Реализация множества на основе массива
+class ArraySet : public SetImpl {
+    static const int MAX_SIZE = 100;
+    int data[MAX_SIZE];
+    int current_size;
+public:
+    ArraySet() : current_size(0) {}
+
+    void add(int value) override {
+        if (current_size < MAX_SIZE && !contains(value)) {
+            data[current_size++] = value;
+        }
+    }
+
+    void remove(int value) override {
+        for (int i = 0; i < current_size; ++i) {
+            if (data[i] == value) {
+                data[i] = data[--current_size];
+                return;
+            }
+        }
+    }
+
+    bool contains(int value) const override {
+        for (int i = 0; i < current_size; ++i) {
+            if (data[i] == value) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    int size() const override {
+        return current_size;
+    }
+};
+
+// Реализация множества на основе std::vector
+class VectorSet : public SetImpl {
+    std::vector<int> data;
+public:
+    void add(int value) override {
+        if (!contains(value)) {
+            data.push_back(value);
+        }
+    }
+
+    void remove(int value) override {
+        data.erase(std::remove(data.begin(), data.end(), value), data.end());
+    }
+
+    bool contains(int value) const override {
+        return std::find(data.begin(), data.end(), value) != data.end();
+    }
+
+    int size() const override {
+        return data.size();
+    }
+};
+
+// Реализация множества на основе std::list
+class ListSet : public SetImpl {
+    std::list<int> data;
+public:
+    void add(int value) override {
+        if (!contains(value)) {
+            data.push_back(value);
+        }
+    }
+
+    void remove(int value) override {
+        data.remove(value);
+    }
+
+    bool contains(int value) const override {
+        return std::find(data.begin(), data.end(), value) != data.end();
+    }
+
+    int size() const override {
+        return data.size();
+    }
+};
+
+// Класс, представляющий множество с возможностью переключения реализации
+class Set {
+    SetImpl* impl;
+public:
+    Set() : impl(new ArraySet()) {}
+
+    ~Set() {
+        delete impl;
+    }
+
+    void add(int value) {
+        impl->add(value);
+        adjust();
+    }
+
+    void remove(int value) {
+        impl->remove(value);
+        adjust();
+    }
+
+    bool contains(int value) const {
+        return impl->contains(value);
+    }
+
+    int size() const {
+        return impl->size();
+    }
+
+private:
+    // Метод для переключения реализации в зависимости от размера множества
+    void adjust() {
+        int current_size = impl->size();
+        SetImpl* new_impl = nullptr;
+
+        if (current_size <= 100) {
+            if (dynamic_cast<ArraySet*>(impl)) return;
+            new_impl = new ArraySet();
+        }
+        else if (current_size <= 1000) {
+            if (dynamic_cast<VectorSet*>(impl)) return;
+            new_impl = new VectorSet();
+        }
+        else {
+            if (dynamic_cast<ListSet*>(impl)) return;
+            new_impl = new ListSet();
+        }
+
+        if (new_impl) {
+            for (int i = 0; i < current_size; ++i) {
+                new_impl->add(impl->contains(i) ? i : -1);
+            }
+            delete impl;
+            impl = new_impl;
+        }
+    }
+};
+
+// Функция main для тестирования
+int main() {
+    Set mySet;
+
+    std::cout << "Initial size: " << mySet.size() << std::endl;
+
+    // Добавляем 50 элементов
+    for (int i = 0; i < 50; ++i) {
+        mySet.add(i);
+    }
+
+    std::cout << "Size after adding 50 elements: " << mySet.size() << std::endl;
+
+    // Проверяем наличие элементов
+    std::cout << "Contains 25: " << mySet.contains(25) << std::endl;
+    std::cout << "Contains 100: " << mySet.contains(100) << std::endl;
+
+    // Добавляем еще 1000 элементов
+    for (int i = 50; i < 2050; ++i) {
+        mySet.add(i);
+    }
+
+    std::cout << "Size after adding 1000 more elements: " << mySet.size() << std::endl;
+
+    // Проверяем наличие элементов
+    std::cout << "Contains 500: " << mySet.contains(500) << std::endl;
+    std::cout << "Contains 1050: " << mySet.contains(1050) << std::endl;
+
+    // Удаляем первые 50 элементов
+    for (int i = 0; i < 50; ++i) {
+        mySet.remove(i);
+    }
+
+    std::cout << "Size after removing 50 elements: " << mySet.size() << std::endl;
+
+    // Проверяем наличие элементов
+    std::cout << "Contains 25 after removal: " << mySet.contains(25) << std::endl;
+    std::cout << "Contains 0 after removal: " << mySet.contains(0) << std::endl;
+}
