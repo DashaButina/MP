@@ -1,0 +1,226 @@
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <algorithm>
+#include <chrono>
+
+using namespace std;
+
+struct Flower {
+    string name;
+    string color;
+    string scent;
+    string region;
+
+    Flower(string n, string c, string s, string r) : name(n), color(c), scent(s), region(r) {}
+    friend bool operator== (const Flower& a, const Flower& b) {
+        return (a.name == b.name && a.color == b.color && a.scent == b.scent);
+    }
+
+    friend bool operator< (const Flower& a, const Flower& b) {
+        return (a.name < b.name || ((a.name == b.name) && (a.color < b.color)) || ((a.name == b.name) && (a.color == b.color) && (a.scent < b.scent)) || ((a.name == b.name) && (a.color == b.color) && (a.scent == b.scent)));
+    }
+
+    friend bool operator<= (const Flower& a, const Flower& b) {
+        return (a < b || a == b);
+    }
+
+    friend bool operator> (const Flower& a, const Flower& b) {
+        return (!(a < b) && !(a == b));
+    }
+
+    friend bool operator>= (const Flower& a, const Flower& b) {
+        return !(a < b);
+    }
+
+    friend ostream& operator<<(ostream& os, const Flower& a) {
+        os << a.name << ' ' << a.color << ' ' << a.scent << ' ' << a.region << '\n';
+        return os;
+    }
+
+};
+
+// Функция для чтения данных из файла
+vector<Flower> readFlowersFromFile(const string& filename) {
+    vector<Flower> flowers;
+    ifstream file(filename);
+    if (!file.is_open()) {
+        cerr << "Error: Unable to open file for reading." << endl;
+        return flowers;
+    }
+
+    string name, color, scent, region;
+    while (file >> name >> color >> scent >> region) {
+        flowers.emplace_back(name, color, scent, region);
+    }
+
+    file.close();
+    return flowers;
+}
+
+// Функция для записи данных в файл
+void writeOutput(const std::string& outputFile, const std::string& title, const std::vector<std::vector<Flower>>& res) {
+    std::ofstream fout(outputFile, std::ios::app);
+
+    fout << title << "\n";
+
+    for (size_t i = 0; i < res.size(); ++i) {
+        // Вывод числа записей
+        fout << "Размер: " << res[i].size() << "\n";
+        for (size_t j = 0; j < res[i].size(); ++j) {
+            // Вывод объекта
+            fout << res[i][j] << "\n";
+        }
+    }
+}
+
+// --------------------------------Быстрая сортировка-----------------------------------------------
+
+// Функция для разделения массива и возврата индекса опорного элемента
+int partition(vector<Flower>& arr, int low, int high) {
+    Flower pivot = arr[high]; // Выбираем последний элемент массива в качестве опорного элемента
+    int i = (int)(low - 1); // Инициализируем индекс меньшего элемента
+    // Если текущий элемент меньше или равен опорному
+    for (int j = low; j <= high - 1; j++) {
+        if (arr[j].name <= pivot.name) {
+            i++; // Увеличиваем индекс меньшего элемента
+            swap(arr[i], arr[j]); // Меняем местами текущий элемент и элемент с индексом i
+        }
+    }
+    swap(arr[i + 1], arr[high]); // Меняем местами опорный элемент и элемент с индексом i+1
+    return (i + 1); // Возвращаем индекс опорного элемента
+}
+
+// Рекурсивная функция для быстрой сортировки
+void quickSortRecursive(vector<Flower>& arr, int low, int high) {
+    if (low < high) { // Если в подмассиве больше одного элемента
+        int pi = partition(arr, low, high); // Получаем индекс опорного элемента после разделения
+
+        // Рекурсивно сортируем элементы перед и после опорного элемента
+        quickSortRecursive(arr, low, pi - 1);
+        quickSortRecursive(arr, pi + 1, high);
+    }
+}
+
+
+// Основная функция для быстрой сортировки
+vector<Flower> quickSort(vector<Flower>& vec) {
+    vector<Flower> arr = vec; 
+    int n = arr.size();
+    quickSortRecursive(arr, 0, n - 1);
+    return arr;
+}
+
+// --------------------------------Пирамидальная сортировка-----------------------------------------------
+
+// Функция для создания пирамиды из поддерева с корнем i
+void heapify(vector<Flower>& arr, int n, int i) {
+    int largest = i; // Инициализируем largest как корень
+    int left = 2 * i + 1; // Левый дочерний узел
+    int right = 2 * i + 2; // Правый дочерний узел
+
+    // Если левый дочерний узел больше корня
+    if (left < n && arr[left].name > arr[largest].name)
+        largest = left;
+
+    // Если правый дочерний узел больше, чем самый большой элемент на данный момент
+    if (right < n && arr[right].name > arr[largest].name)
+        largest = right;
+
+    // Если самый большой элемент не корень
+    if (largest != i) {
+        swap(arr[i], arr[largest]); // Меняем местами
+        heapify(arr, n, largest);
+    }
+}
+
+// Основная функция для сортировки массива с использованием пирамиды
+vector<Flower> heapSort(vector<Flower> vec) {
+    vector<Flower> arr = vec;
+    int n = arr.size();
+
+    // Построение пирамиды (перегруппировка массива)
+    for (int i = n / 2 - 1; i >= 0; i--)
+        heapify(arr, n, i);
+
+    // Один за другим извлекаем элементы из пирамиды
+    for (int i = n - 1; i > 0; i--) {
+        swap(arr[0], arr[i]); // Перемещаем текущий корень в конец
+        heapify(arr, i, 0); // Вызываем heapify на уменьшенной куче
+    }
+
+    return arr;
+}
+
+// --------------------------------Сортировка выбором-----------------------------------------------
+
+vector<Flower> selectionSort(const vector<Flower>& vec) {
+    vector<Flower> arr = vec;
+    int n = arr.size();
+
+    for (int i = 0; i < n - 1; i++) {
+        int min_idx = i;
+        for (int j = i + 1; j < n; j++) {
+            if (arr[j].name < arr[min_idx].name)
+                min_idx = j;
+        }
+        swap(arr[min_idx], arr[i]);
+    }
+
+    return arr;
+}
+
+int main() {
+    // Чтение данных о цветках из файла
+    vector<Flower> initialArray = readFlowersFromFile("D:\\arr.txt");
+
+    // Создание подвыборок различной длины
+    vector<int> sampleLengths = { 100, 1000, 10000, 20000, 50000, 75000, 100000 };
+    for (int length : sampleLengths) {
+        vector<Flower> subArray(initialArray.begin(), initialArray.begin() + length);
+
+        // Засечение времени для сортировки пирамидальной сортировкой
+        auto start = chrono::steady_clock::now();
+        vector<Flower> heapSortedArray = heapSort(subArray);
+        auto end = chrono::steady_clock::now();
+        chrono::duration<double> heapSortTime = end - start;
+        cout << "Heap Sort Time for " << length << " elements: " << heapSortTime.count() << " seconds" << endl;
+
+        // Запись отсортированных данных в файл 
+        std::vector<std::vector<Flower>> heapSortRes;
+        heapSortRes.push_back(heapSortedArray);
+        std::string outputFile = "D:\\heap_sort.txt";
+        writeOutput("Пирамидальная сортировка:\n", outputFile, heapSortRes);
+
+        // Засечение времени для сортировки быстрой сортировкой
+        start = chrono::steady_clock::now();
+        vector<Flower> quickSortedArray = quickSort(initialArray);
+        end = chrono::steady_clock::now();
+        chrono::duration<double> quickSortTime = end - start;
+        cout << "Quick Sort Time: " << quickSortTime.count() << " seconds" << endl;
+
+        // Запись отсортированных данных в файл 
+        std::vector<std::vector<Flower>> quickSortRes;
+        quickSortRes.push_back(quickSortedArray);
+        std::string outputFile = "D:\\quick_sort.txt";
+        writeOutput("Быстрая сортировка:\n", outputFile, quickSortRes);
+
+
+        // Засечение времени для сортировки выбором
+        auto start = chrono::steady_clock::now();
+        vector<Flower> selectionSortedArray = selectionSort(subArray);
+        auto end = chrono::steady_clock::now();
+        chrono::duration<double> selectionSortTime = end - start;
+        cout << "Selection Sort Time for " << length << " elements: " << selectionSortTime.count() << " seconds" << endl;
+
+        // Запись отсортированных данных в файл
+        std::vector<std::vector<Flower>> selectionSortRes;
+        selectionSortRes.push_back(selectionSortedArray);
+        std::string outputFile = "D:\\selection_sort.txt";
+        writeOutput("Сортировка выбором:\n", outputFile, selectionSortRes);
+
+    }
+
+    return 0;
+}
+
