@@ -1,0 +1,162 @@
+#include <iostream>
+#include <vector>
+#include <cmath>
+#include <ctime>
+#include <chrono>
+#include <algorithm>
+#include <random>
+#include <fstream>
+
+// Метод Itamaracá (Ita)
+uint64_t itaGenerator(uint64_t& state) {
+    uint64_t a = 6364136223846793005ULL;
+    uint64_t c = 1442695040888963407ULL;
+    state = a * state + c;
+    return state;
+}
+
+// Модифицированный метод серединных произведений
+uint64_t middleSquareModified(uint64_t& state) {
+    uint64_t squared = state * state;
+    uint64_t middle = (squared / 100) % 100000000;
+    state = middle;
+    return state;
+}
+
+// Генерация выборок
+std::vector<std::vector<uint64_t>> generateSamples(uint64_t seed, size_t sampleSize, size_t numSamples, uint64_t(*generator)(uint64_t&)) {
+    std::vector<std::vector<uint64_t>> samples(numSamples);
+    uint64_t state = seed;
+    for (size_t i = 0; i < numSamples; ++i) {
+        for (size_t j = 0; j < sampleSize; ++j) {
+            samples[i].push_back(generator(state) % 5000);  // Ограничение диапазона до 5000
+        }
+    }
+    return samples;
+}
+
+// Вычисление среднего
+double calculateMean(const std::vector<uint64_t>& data) {
+    double sum = 0;
+    for (uint64_t value : data) {
+        sum += value;
+    }
+    return sum / data.size();
+}
+
+// Вычисление стандартного отклонения
+double calculateStandardDeviation(const std::vector<uint64_t>& data, double mean) {
+    double sum = 0;
+    for (uint64_t value : data) {
+        sum += (value - mean) * (value - mean);
+    }
+    return std::sqrt(sum / data.size());
+}
+
+// Коэффициент вариации
+double calculateCoefficientOfVariation(double mean, double standardDeviation) {
+    return standardDeviation / mean;
+}
+
+// Хи-квадрат тест
+bool chiSquareTest(const std::vector<uint64_t>& data, int numBuckets = 10) {
+    int n = data.size();
+    std::vector<int> buckets(numBuckets, 0);
+    for (uint64_t value : data) {
+        buckets[value * numBuckets / 5000]++;
+    }
+
+    double expected = n / numBuckets;
+    double chiSquare = 0;
+    for (int i = 0; i < numBuckets; ++i) {
+        chiSquare += (buckets[i] - expected) * (buckets[i] - expected) / expected;
+    }
+
+    // Критическое значение Хи-квадрат для 9 степеней свободы и уровня значимости 0.05
+    double chiSquareCritical = 16.919;
+    return chiSquare < chiSquareCritical;
+}
+
+// Замер времени генерации чисел
+void measureGenerationTime(uint64_t seed, size_t numElements, uint64_t(*generator)(uint64_t&)) {
+    auto start = std::chrono::high_resolution_clock::now();
+    uint64_t state = seed;
+    for (size_t i = 0; i < numElements; ++i) {
+        generator(state);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration = end - start;
+    std::cout << "Time to generate " << numElements << " elements: " << duration.count() << " seconds" << std::endl;
+}
+
+int main() {
+    uint64_t seed = std::time(nullptr);
+    size_t sampleSize = 100;
+    size_t numSamples = 20;
+
+    // Генерация выборок
+    auto itaSamples = generateSamples(seed, sampleSize, numSamples, itaGenerator);
+    auto middleSquareSamples = generateSamples(seed, sampleSize, numSamples, middleSquareModified);
+
+    // Вычисление статистических характеристик для каждой выборки
+    for (size_t i = 0; i < numSamples; ++i) {
+        double itaMean = calculateMean(itaSamples[i]);
+        double itaStdDev = calculateStandardDeviation(itaSamples[i], itaMean);
+        double itaCoeffVar = calculateCoefficientOfVariation(itaMean, itaStdDev);
+
+        double middleSquareMean = calculateMean(middleSquareSamples[i]);
+        double middleSquareStdDev = calculateStandardDeviation(middleSquareSamples[i], middleSquareMean);
+        double middleSquareCoeffVar = calculateCoefficientOfVariation(middleSquareMean, middleSquareStdDev);
+
+        std::cout << "ITA Generator Sample " << i + 1 << ":" << std::endl;
+        std::cout << "  Mean: " << itaMean << std::endl;
+        std::cout << "  Standard Deviation: " << itaStdDev << std::endl;
+        std::cout << "  Coefficient of Variation: " << itaCoeffVar << std::endl;
+
+        std::cout << "Middle Square Modified Generator Sample " << i + 1 << ":" << std::endl;
+        std::cout << "  Mean: " << middleSquareMean << std::endl;
+        std::cout << "  Standard Deviation: " << middleSquareStdDev << std::endl;
+        std::cout << "  Coefficient of Variation: " << middleSquareCoeffVar << std::endl;
+    }
+
+    // Проверка на равномерность распределения и случайность
+    bool itaChiSquare = true;
+    bool middleSquareChiSquare = true;
+    for (const auto& sample : itaSamples) {
+        itaChiSquare &= chiSquareTest(sample);
+    }
+    for (const auto& sample : middleSquareSamples) {
+        middleSquareChiSquare &= chiSquareTest(sample);
+    }
+
+    std::cout << "ITA Generator Chi-Square Test: " << (itaChiSquare ? "Passed" : "Failed") << std::endl;
+    std::cout << "Middle Square Modified Generator Chi-Square Test: " << (middleSquareChiSquare ? "Passed" : "Failed") << std::endl;
+
+    // Замер времени генерации чисел
+    measureGenerationTime(seed, 1000, itaGenerator);
+    measureGenerationTime(seed, 1000000, itaGenerator);
+    measureGenerationTime(seed, 1000, middleSquareModified);
+    measureGenerationTime(seed, 1000000, middleSquareModified);
+
+    // Для проверки с помощью тестов NIST и Diehard необходимо использовать внешние инструменты.
+    // Сохранение данных для тестирования внешними инструментами.
+    std::ofstream itaFile("ita_samples.txt");
+    for (const auto& sample : itaSamples) {
+        for (const auto& val : sample) {
+            itaFile << val << "\n";
+        }
+    }
+    itaFile.close();
+
+    std::ofstream middleSquareFile("middle_square_samples.txt");
+    for (const auto& sample : middleSquareSamples) {
+        for (const auto& val : sample) {
+            middleSquareFile << val << "\n";
+        }
+    }
+    middleSquareFile.close();
+
+    std::cout << "Samples saved for external testing with NIST and Diehard tests." << std::endl;
+
+    return 0;
+}
